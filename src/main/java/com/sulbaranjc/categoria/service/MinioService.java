@@ -61,4 +61,19 @@ public class MinioService {
             throw new RuntimeException("Error generando URL presignada: " + e.getMessage(), e);
         }
     }
+    public void subirArchivoConNombre(MultipartFile archivo, String nombreUnico) throws Exception {
+        try (InputStream inputStream = archivo.getInputStream()) {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(nombreUnico)
+                            .stream(inputStream, archivo.getSize(), -1)
+                            .contentType(archivo.getContentType())
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Error al subir el archivo: " + e.getMessage(), e);
+        }
+    }
+
 }

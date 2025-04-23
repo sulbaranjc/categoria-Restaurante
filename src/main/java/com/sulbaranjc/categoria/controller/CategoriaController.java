@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/categorias")
@@ -21,14 +23,14 @@ public class CategoriaController {
     @Autowired
     private MinioService minioService;
 
-    // Solo este método necesita cambio
+    // SIN CAMBIOS
     @GetMapping
     public List<CategoriaDTO> listarCategorias() {
         List<Categoria> categorias = categoriaRepository.findAll();
         return categorias.stream().map(categoria -> {
             String urlImagen = minioService.generarPresignedUrl(
                     categoria.getImagen(),
-                    60 // duración en minutos
+                    60
             );
             return new CategoriaDTO(
                     categoria.getId(),
@@ -39,7 +41,7 @@ public class CategoriaController {
         }).toList();
     }
 
-    // Sin cambios
+    // SIN CAMBIOS
     @PostMapping
     public ResponseEntity<?> crearCategoria(@RequestBody Categoria categoria) {
         if (categoriaRepository.existsByNombre(categoria.getNombre())) {
@@ -49,7 +51,7 @@ public class CategoriaController {
         return ResponseEntity.ok(nuevaCategoria);
     }
 
-    // Sin cambios
+    // SIN CAMBIOS
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizarCategoria(@PathVariable Long id, @RequestBody Categoria categoriaActualizada) {
         return categoriaRepository.findById(id).map(categoria -> {
@@ -61,7 +63,7 @@ public class CategoriaController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // Sin cambios
+    // SIN CAMBIOS
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarCategoria(@PathVariable Long id) {
         return categoriaRepository.findById(id).map(categoria -> {
@@ -70,4 +72,35 @@ public class CategoriaController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    // NUEVO MÉTODO para crear categoría con imagen (multipart/form-data)
+    @PostMapping("/crear")
+    public ResponseEntity<?> crearCategoriaConImagen(
+            @RequestParam("nombre") String nombre,
+            @RequestParam("descripcion") String descripcion,
+            @RequestParam("imagen") MultipartFile imagen) {
+
+        try {
+            if (categoriaRepository.existsByNombre(nombre)) {
+                return ResponseEntity.badRequest().body("La categoría ya existe");
+            }
+
+            // Generar nombre único para la imagen
+            String nombreUnico = UUID.randomUUID().toString() + "-" + imagen.getOriginalFilename();
+
+            // Subir imagen a MinIO
+            minioService.subirArchivoConNombre(imagen, nombreUnico);
+
+            // Crear y guardar categoría
+            Categoria categoria = new Categoria();
+            categoria.setNombre(nombre);
+            categoria.setDescripcion(descripcion);
+            categoria.setImagen(nombreUnico); // Guardamos solo el nombre único
+            categoriaRepository.save(categoria);
+
+            return ResponseEntity.ok("Categoría creada con éxito");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error al crear categoría: " + e.getMessage());
+        }
+    }
 }
